@@ -1,10 +1,26 @@
 import uuid
 from langchain.llms import LlamaCpp
 from langchain.prompts import PromptTemplate
-from langchain import LLMChain, ConversationChain
+from langchain.chains import LLMChain, ConversationChain
 #from langchain.memory import ChatMessageHistory, ConversationBufferMemory
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import AIMessage, HumanMessage
+
+IMAGE_PROMPT_TEMPLATE = """### Instruction:
+The following is the history of a game's progress.
+Create an Stable Diffusion prompt to most accurately create an image of the most recent interaction.
+HISTORY will define the history so far.
+RECENT states the most recent human and AI interaction.
+The Prompt should be 150 tokens or less.
+
+HISTORY:
+{history}
+
+RECENT:
+{input}
+
+### Response:
+"""
 
 TEMPLATE = """### Instruction:
 The following is an RPG style game.
@@ -52,17 +68,17 @@ class Llama:
 
         self.prompt = None
         self.llm = None
-        self.conversation = {}
+        self.conversation = {'0': None}
         self.session = None
 
-    def createTemplate(self, template=None):
+    def createTemplate(self, template=None, inputs=["history", "input"]):
         if template is None:
             self.template = TEMPLATE
         else:
             self.template = template
 
         self.prompt = PromptTemplate(
-            input_variables=["history", "input"],
+            input_variables=inputs,
             template=self.template,
         )
 
@@ -74,7 +90,7 @@ class Llama:
             n_ctx=self.n_ctx,
             temperature=self.temperature,
         )
-        self.llm.client.verbose = False
+        self.llm.client.verbose = True
 
     def createConversation(self, ai_name="AI", session='0'):
         if session not in self.conversation:
@@ -99,6 +115,11 @@ class Llama:
 
         return response
     
+    def predictImagePrompt(self, recent, history, session='0'):
+        response = self.conversation[session].predict(input=recent, history=history)
+
+        return response
+
     def appendHistory(self, message, history):
         for human, ai in history:
             self.history.append(HumanMessage(content=human))
